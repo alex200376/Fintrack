@@ -17,16 +17,38 @@ import * as Haptics from "expo-haptics";
 
 import { useTheme } from "@/hooks/useTheme";
 import { useFinance, type Transaction } from "@/context/FinanceContext";
+import { useProfile } from "@/context/ProfileContext";
 import { TransactionItem } from "@/components/TransactionItem";
 import { spacing, radius, fontSize } from "@/constants/theme";
 
 const FILTERS = ["All", "Income", "Expense"] as const;
 type Filter = typeof FILTERS[number];
 
+function groupByMonth(transactions: Transaction[]) {
+  const groups: Record<string, Transaction[]> = {};
+  for (const tx of transactions) {
+    const date = new Date(tx.date);
+    const key = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}`;
+    if (!groups[key]) groups[key] = [];
+    groups[key].push(tx);
+  }
+  return Object.entries(groups).sort((a, b) => b[0].localeCompare(a[0]));
+}
+
+function formatGroupKey(key: string) {
+  const [year, month] = key.split("-");
+  const date = new Date(Number(year), Number(month) - 1);
+  const now = new Date();
+  if (date.getFullYear() === now.getFullYear() && date.getMonth() === now.getMonth()) return "This Month";
+  if (date.getFullYear() === now.getFullYear() && date.getMonth() === now.getMonth() - 1) return "Last Month";
+  return date.toLocaleDateString("en-US", { month: "long", year: "numeric" });
+}
+
 export default function TransactionsScreen() {
   const { colors } = useTheme();
   const insets = useSafeAreaInsets();
   const { fetchTransactions } = useFinance();
+  const { profile } = useProfile();
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -41,266 +63,198 @@ export default function TransactionsScreen() {
     setTransactions(data);
   }, [fetchTransactions, filter]);
 
-  useEffect(() => {
-    setLoading(true);
-    loadData().finally(() => setLoading(false));
-  }, [filter]);
+  useEffect(() => { setLoading(true); loadData().finally(() => setLoading(false)); }, [filter]);
+  useFocusEffect(useCallback(() => { loadData(); }, [loadData]));
 
-  useFocusEffect(
-    useCallback(() => {
-      loadData();
-    }, [loadData])
-  );
+  const onRefresh = useCallback(async () => { setRefreshing(true); await loadData(); setRefreshing(false); }, [loadData]);
 
-  const onRefresh = useCallback(async () => {
-    setRefreshing(true);
-    await loadData();
-    setRefreshing(false);
-  }, [loadData]);
+  const topPad = Platform.OS === "web" ? 67 : insets.top;
+  const bottomPad = Platform.OS === "web" ? 34 + 84 : insets.bottom + 84;
+  const cur = profile.currency || "$";
 
-  const filtered = transactions.filter(t => {
-    if (!search.trim()) return true;
-    const q = search.toLowerCase();
-    return (
-      t.categoryName.toLowerCase().includes(q) ||
-      (t.note ?? "").toLowerCase().includes(q)
-    );
-  });
+  const filtered = search.trim()
+    ? transactions.filter(t =>
+        t.categoryName.toLowerCase().includes(search.toLowerCase()) ||
+        (t.note ?? "").toLowerCase().includes(search.toLowerCase())
+      )
+    : transactions;
 
-  const grouped: { title: string; data: Transaction[] }[] = [];
-  const groupMap = new Map<string, Transaction[]>();
-  for (const t of filtered) {
-    const date = new Date(t.date);
-    const key = date.toLocaleDateString("en-US", { month: "long", year: "numeric" });
-    if (!groupMap.has(key)) groupMap.set(key, []);
-    groupMap.get(key)!.push(t);
+  const grouped = groupByMonth(filtered);
+
+  const totalIncome = filtered.filter(t => t.type === "income").reduce((s, t) => s + t.amount, 0);
+  const totalExpense = filtered.filter(t => t.type === "expense").reduce((s, t) => s + t.amount, 0);
+
+  type ListItem =
+    | { type: "stats" }
+    | { type: "search" }
+    | { type: "filters" }
+    | { type: "header"; key: string; label: string }
+    | { type: "transaction"; transaction: Transaction; isLast: boolean }
+    | { type: "empty" };
+
+  const listData: ListItem[] = [
+    { type: "stats" },
+    { type: "search" },
+    { type: "filters" },
+  ];
+
+  if (loading) {
+    // empty
+  } else if (grouped.length === 0) {
+    listData.push({ type: "empty" });
+  } else {
+    for (const [key, txs] of grouped) {
+      listData.push({ type: "header", key, label: formatGroupKey(key) });
+      txs.forEach((tx, i) => listData.push({ type: "transaction", transaction: tx, isLast: i === txs.length - 1 }));
+    }
   }
-  for (const [title, data] of groupMap) {
-    grouped.push({ title, data });
-  }
 
-  const flatData: Array<{ type: "header"; title: string } | { type: "item"; transaction: Transaction; isLast: boolean }> = [];
-  for (const group of grouped) {
-    flatData.push({ type: "header", title: group.title });
-    group.data.forEach((t, i) => {
-      flatData.push({ type: "item", transaction: t, isLast: i === group.data.length - 1 });
-    });
-  }
-
-  const topPadding = Platform.OS === "web" ? 67 : insets.top;
-
-  return (
-    <View style={[styles.container, { backgroundColor: colors.background }]}>
-      {/* Header */}
-      <View
-        style={[
-          styles.header,
-          {
-            paddingTop: topPadding + spacing.md,
-            backgroundColor: colors.background,
-          },
-        ]}
-      >
-        <Text style={[styles.title, { color: colors.text }]}>Transactions</Text>
-        <Pressable
-          onPress={() => {
-            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-            router.push("/add-transaction");
-          }}
-          style={[styles.addButton, { backgroundColor: colors.tint }]}
-        >
-          <Ionicons name="add" size={24} color="#fff" />
-        </Pressable>
-      </View>
-
-      {/* Search */}
-      <View style={[styles.searchContainer, { backgroundColor: colors.surface }]}>
-        <Ionicons name="search" size={18} color={colors.textTertiary} />
-        <TextInput
-          style={[styles.searchInput, { color: colors.text }]}
-          placeholder="Search transactions..."
-          placeholderTextColor={colors.textTertiary}
-          value={search}
-          onChangeText={setSearch}
-        />
-        {search.length > 0 && (
-          <Pressable onPress={() => setSearch("")}>
-            <Ionicons name="close-circle" size={18} color={colors.textTertiary} />
-          </Pressable>
-        )}
-      </View>
-
-      {/* Filter Tabs */}
-      <View style={styles.filterRow}>
-        {FILTERS.map(f => (
-          <Pressable
-            key={f}
-            onPress={() => {
-              Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-              setFilter(f);
-            }}
-            style={[
-              styles.filterTab,
-              {
-                backgroundColor: filter === f ? colors.tint : colors.surface,
-              },
-            ]}
-          >
-            <Text
-              style={[
-                styles.filterText,
-                { color: filter === f ? "#fff" : colors.textSecondary },
-              ]}
-            >
-              {f}
+  const renderItem = ({ item }: { item: ListItem }) => {
+    if (item.type === "stats") {
+      return (
+        <View style={styles.statsRow}>
+          <View style={[styles.statCard, { backgroundColor: colors.income + "14" }]}>
+            <Ionicons name="arrow-down-circle" size={18} color={colors.income} />
+            <Text style={[styles.statAmt, { color: colors.income }]}>
+              {cur}{totalIncome.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
             </Text>
-          </Pressable>
-        ))}
-      </View>
-
-      {loading ? (
-        <View style={styles.loadingContainer}>
-          <ActivityIndicator color={colors.tint} />
+            <Text style={[styles.statLbl, { color: colors.textSecondary }]}>Income</Text>
+          </View>
+          <View style={[styles.statCard, { backgroundColor: colors.expense + "14" }]}>
+            <Ionicons name="arrow-up-circle" size={18} color={colors.expense} />
+            <Text style={[styles.statAmt, { color: colors.expense }]}>
+              {cur}{totalExpense.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+            </Text>
+            <Text style={[styles.statLbl, { color: colors.textSecondary }]}>Expenses</Text>
+          </View>
         </View>
-      ) : flatData.length === 0 ? (
-        <View style={styles.emptyContainer}>
-          <Ionicons name="receipt-outline" size={56} color={colors.textTertiary} />
+      );
+    }
+    if (item.type === "search") {
+      return (
+        <View style={[styles.searchBar, { backgroundColor: colors.surface }]}>
+          <Ionicons name="search-outline" size={18} color={colors.textTertiary} />
+          <TextInput
+            style={[styles.searchInput, { color: colors.text }]}
+            placeholder="Search transactions..."
+            placeholderTextColor={colors.textTertiary}
+            value={search}
+            onChangeText={setSearch}
+          />
+          {search.length > 0 && (
+            <Pressable onPress={() => setSearch("")} hitSlop={8}>
+              <Ionicons name="close-circle" size={18} color={colors.textTertiary} />
+            </Pressable>
+          )}
+        </View>
+      );
+    }
+    if (item.type === "filters") {
+      return (
+        <View style={styles.filtersRow}>
+          {FILTERS.map(f => (
+            <Pressable
+              key={f}
+              onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); setFilter(f); }}
+              style={[styles.filterChip, { backgroundColor: filter === f ? colors.tint : colors.surface }]}
+            >
+              <Text style={[styles.filterChipText, { color: filter === f ? "#fff" : colors.textSecondary }]}>{f}</Text>
+            </Pressable>
+          ))}
+          <Pressable
+            onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium); router.push("/add-transaction"); }}
+            style={[styles.addChip, { backgroundColor: colors.tint }]}
+          >
+            <Ionicons name="add" size={16} color="#fff" />
+            <Text style={styles.addChipText}>Add</Text>
+          </Pressable>
+        </View>
+      );
+    }
+    if (item.type === "header") {
+      return <Text style={[styles.groupHeader, { color: colors.textSecondary }]}>{item.label}</Text>;
+    }
+    if (item.type === "transaction") {
+      const { transaction, isLast } = item;
+      return (
+        <View style={[styles.txGroup, { backgroundColor: colors.surface }]}>
+          <TransactionItem
+            transaction={transaction}
+            onPress={() => router.push({ pathname: "/transaction-detail", params: { id: transaction.id } })}
+          />
+          {!isLast && <View style={[styles.sep, { backgroundColor: colors.borderLight }]} />}
+        </View>
+      );
+    }
+    if (item.type === "empty") {
+      return (
+        <View style={[styles.emptyCard, { backgroundColor: colors.surface }]}>
+          <Ionicons name="receipt-outline" size={52} color={colors.textTertiary} />
           <Text style={[styles.emptyTitle, { color: colors.text }]}>No transactions</Text>
-          <Text style={[styles.emptySubtitle, { color: colors.textSecondary }]}>
-            Add your first transaction to get started
+          <Text style={[styles.emptySub, { color: colors.textSecondary }]}>
+            {search || filter !== "All" ? "Try adjusting your filters" : "Add your first transaction above"}
           </Text>
         </View>
-      ) : (
-        <FlatList
-          data={flatData}
-          keyExtractor={(item, i) =>
-            item.type === "header" ? `header-${item.title}` : item.transaction.id
-          }
-          renderItem={({ item }) => {
-            if (item.type === "header") {
-              return (
-                <Text style={[styles.groupHeader, { color: colors.textSecondary }]}>
-                  {item.title}
-                </Text>
-              );
-            }
-            return (
-              <View style={{ backgroundColor: colors.surface, marginHorizontal: spacing.md }}>
-                <TransactionItem
-                  transaction={item.transaction}
-                  onPress={() =>
-                    router.push({
-                      pathname: "/transaction-detail",
-                      params: { id: item.transaction.id },
-                    })
-                  }
-                />
-                {!item.isLast && (
-                  <View
-                    style={[styles.separator, { backgroundColor: colors.borderLight }]}
-                  />
-                )}
-              </View>
-            );
-          }}
-          refreshControl={
-            <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.tint} />
-          }
-          contentContainerStyle={{
-            paddingBottom: Platform.OS === "web" ? 34 + 84 : 100,
-          }}
-          showsVerticalScrollIndicator={false}
-          ItemSeparatorComponent={() => null}
-        />
-      )}
-    </View>
+      );
+    }
+    return null;
+  };
+
+  return (
+    <FlatList
+      style={[styles.list, { backgroundColor: colors.background }]}
+      contentContainerStyle={{ paddingTop: topPad + spacing.md, paddingBottom: bottomPad, paddingHorizontal: spacing.md, gap: 2 }}
+      data={listData}
+      keyExtractor={(item, i) => {
+        if (item.type === "transaction") return item.transaction.id;
+        if (item.type === "header") return `header-${item.key}`;
+        return `${item.type}-${i}`;
+      }}
+      renderItem={renderItem}
+      refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.tint} />}
+      ListHeaderComponent={
+        <View style={styles.pageHeader}>
+          <Text style={[styles.pageTitle, { color: colors.text }]}>Transactions</Text>
+          {loading && <ActivityIndicator color={colors.tint} />}
+        </View>
+      }
+      showsVerticalScrollIndicator={false}
+      ItemSeparatorComponent={({ leadingItem }) => {
+        if (!leadingItem) return null;
+        if (leadingItem.type === "transaction") return null;
+        return <View style={{ height: spacing.sm }} />;
+      }}
+    />
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1 },
-  header: {
+  list: { flex: 1 },
+  pageHeader: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginBottom: spacing.md },
+  pageTitle: { fontSize: fontSize.xxl, fontFamily: "Inter_700Bold" },
+  statsRow: { flexDirection: "row", gap: spacing.sm, marginBottom: spacing.sm },
+  statCard: { flex: 1, borderRadius: radius.xl, padding: spacing.md, alignItems: "center", gap: 4 },
+  statAmt: { fontSize: fontSize.md, fontFamily: "Inter_700Bold" },
+  statLbl: { fontSize: 12, fontFamily: "Inter_400Regular" },
+  searchBar: {
     flexDirection: "row",
     alignItems: "center",
-    justifyContent: "space-between",
+    borderRadius: radius.xl,
     paddingHorizontal: spacing.md,
-    paddingBottom: spacing.md,
-  },
-  title: {
-    fontSize: fontSize.xxl,
-    fontFamily: "Inter_700Bold",
-  },
-  addButton: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  searchContainer: {
-    flexDirection: "row",
-    alignItems: "center",
-    marginHorizontal: spacing.md,
-    marginBottom: spacing.sm,
-    borderRadius: radius.lg,
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.sm + 2,
-    gap: spacing.sm,
-  },
-  searchInput: {
-    flex: 1,
-    fontSize: fontSize.md,
-    fontFamily: "Inter_400Regular",
-    padding: 0,
-  },
-  filterRow: {
-    flexDirection: "row",
-    paddingHorizontal: spacing.md,
+    paddingVertical: 13,
     gap: spacing.sm,
     marginBottom: spacing.sm,
   },
-  filterTab: {
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.sm - 2,
-    borderRadius: radius.full,
-  },
-  filterText: {
-    fontSize: fontSize.sm,
-    fontFamily: "Inter_500Medium",
-  },
-  loadingContainer: {
-    flex: 1,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  emptyContainer: {
-    flex: 1,
-    alignItems: "center",
-    justifyContent: "center",
-    gap: spacing.sm,
-    padding: spacing.xl,
-  },
-  emptyTitle: {
-    fontSize: fontSize.xl,
-    fontFamily: "Inter_600SemiBold",
-    marginTop: spacing.md,
-  },
-  emptySubtitle: {
-    fontSize: fontSize.md,
-    fontFamily: "Inter_400Regular",
-    textAlign: "center",
-  },
-  groupHeader: {
-    fontSize: fontSize.sm,
-    fontFamily: "Inter_600SemiBold",
-    paddingHorizontal: spacing.md,
-    paddingTop: spacing.lg,
-    paddingBottom: spacing.sm,
-    textTransform: "uppercase",
-    letterSpacing: 0.5,
-  },
-  separator: {
-    height: 1,
-    marginHorizontal: spacing.md,
-  },
+  searchInput: { flex: 1, fontSize: fontSize.md, fontFamily: "Inter_400Regular", padding: 0 },
+  filtersRow: { flexDirection: "row", gap: spacing.sm, marginBottom: spacing.md, alignItems: "center" },
+  filterChip: { paddingHorizontal: spacing.md, paddingVertical: 9, borderRadius: radius.full },
+  filterChipText: { fontSize: fontSize.sm, fontFamily: "Inter_500Medium" },
+  addChip: { flexDirection: "row", alignItems: "center", gap: 4, paddingHorizontal: spacing.md, paddingVertical: 9, borderRadius: radius.full, marginLeft: "auto" },
+  addChipText: { color: "#fff", fontSize: fontSize.sm, fontFamily: "Inter_600SemiBold" },
+  groupHeader: { fontSize: 12, fontFamily: "Inter_600SemiBold", letterSpacing: 0.5, paddingHorizontal: 4, paddingTop: spacing.sm, paddingBottom: spacing.xs },
+  txGroup: { borderRadius: radius.xl, overflow: "hidden" },
+  sep: { height: 1, marginHorizontal: spacing.md },
+  emptyCard: { borderRadius: radius.xl, padding: 48, alignItems: "center", gap: spacing.sm, marginTop: spacing.xl },
+  emptyTitle: { fontSize: fontSize.lg, fontFamily: "Inter_500Medium" },
+  emptySub: { fontSize: fontSize.sm, fontFamily: "Inter_400Regular", textAlign: "center" },
 });

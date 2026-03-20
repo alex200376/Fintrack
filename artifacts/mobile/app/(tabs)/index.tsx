@@ -8,12 +8,12 @@ import {
   Pressable,
   Platform,
   ActivityIndicator,
+  Image,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { router, useFocusEffect } from "expo-router";
 import * as Haptics from "expo-haptics";
-
 import { LinearGradient } from "expo-linear-gradient";
 
 import { useTheme } from "@/hooks/useTheme";
@@ -24,12 +24,12 @@ import { DonutChart } from "@/components/DonutChart";
 import { spacing, radius, fontSize } from "@/constants/theme";
 
 const MONTHS = [
-  "January", "February", "March", "April", "May", "June",
-  "July", "August", "September", "October", "November", "December",
+  "January","February","March","April","May","June",
+  "July","August","September","October","November","December",
 ];
 
 export default function DashboardScreen() {
-  const { colors, isDark } = useTheme();
+  const { colors } = useTheme();
   const insets = useSafeAreaInsets();
   const { fetchSummary } = useFinance();
   const { profile, cardTheme } = useProfile();
@@ -39,13 +39,13 @@ export default function DashboardScreen() {
   const [currentMonth, setCurrentMonth] = useState(new Date().getMonth() + 1);
   const [currentYear, setCurrentYear] = useState(new Date().getFullYear());
 
+  const cur = profile.currency || "$";
+
   const loadData = useCallback(async (month?: number, year?: number) => {
     try {
       const data = await fetchSummary(month ?? currentMonth, year ?? currentYear);
       setSummary(data);
-    } catch {
-      setSummary(null);
-    }
+    } catch { setSummary(null); }
   }, [fetchSummary, currentMonth, currentYear]);
 
   useEffect(() => {
@@ -53,11 +53,7 @@ export default function DashboardScreen() {
     loadData().finally(() => setLoading(false));
   }, [currentMonth, currentYear]);
 
-  useFocusEffect(
-    useCallback(() => {
-      loadData();
-    }, [loadData])
-  );
+  useFocusEffect(useCallback(() => { loadData(); }, [loadData]));
 
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
@@ -67,24 +63,16 @@ export default function DashboardScreen() {
 
   const goToPrevMonth = () => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    if (currentMonth === 1) {
-      setCurrentMonth(12);
-      setCurrentYear(y => y - 1);
-    } else {
-      setCurrentMonth(m => m - 1);
-    }
+    if (currentMonth === 1) { setCurrentMonth(12); setCurrentYear(y => y - 1); }
+    else setCurrentMonth(m => m - 1);
   };
 
   const goToNextMonth = () => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     const now = new Date();
     if (currentYear === now.getFullYear() && currentMonth === now.getMonth() + 1) return;
-    if (currentMonth === 12) {
-      setCurrentMonth(1);
-      setCurrentYear(y => y + 1);
-    } else {
-      setCurrentMonth(m => m + 1);
-    }
+    if (currentMonth === 12) { setCurrentMonth(1); setCurrentYear(y => y + 1); }
+    else setCurrentMonth(m => m + 1);
   };
 
   const isCurrentMonth = () => {
@@ -92,11 +80,12 @@ export default function DashboardScreen() {
     return currentYear === now.getFullYear() && currentMonth === now.getMonth() + 1;
   };
 
-  const topPadding = Platform.OS === "web" ? 67 : insets.top;
+  const topPad = Platform.OS === "web" ? 67 : insets.top;
+  const bottomPad = Platform.OS === "web" ? 34 + 84 : insets.bottom + 84;
 
   if (loading) {
     return (
-      <View style={[styles.loadingContainer, { backgroundColor: colors.background, paddingTop: topPadding }]}>
+      <View style={[styles.loadingWrap, { backgroundColor: colors.background, paddingTop: topPad }]}>
         <ActivityIndicator color={colors.tint} size="large" />
       </View>
     );
@@ -108,118 +97,99 @@ export default function DashboardScreen() {
     percentage: c.percentage,
     label: c.categoryName,
   }));
+  const hasCardPhoto = !!profile.cardImageUri;
 
   return (
     <ScrollView
       style={[styles.scroll, { backgroundColor: colors.background }]}
-      contentContainerStyle={[
-        styles.content,
-        {
-          paddingTop: topPadding + spacing.md,
-          paddingBottom: Platform.OS === "web" ? 34 + 84 : 100,
-        },
-      ]}
-      refreshControl={
-        <RefreshControl
-          refreshing={refreshing}
-          onRefresh={onRefresh}
-          tintColor={colors.tint}
-        />
-      }
+      contentContainerStyle={{ paddingTop: topPad + spacing.md, paddingBottom: bottomPad, paddingHorizontal: spacing.md, gap: spacing.md }}
+      refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.tint} />}
       showsVerticalScrollIndicator={false}
     >
       {/* Header */}
       <View style={styles.header}>
         <View>
           <Text style={[styles.greeting, { color: colors.textSecondary }]}>
-            {profile.name ? `Hello, ${profile.name} ${profile.avatar}` : "Personal Finance"}
+            {profile.name ? `Hello, ${profile.name} ${profile.avatar}` : "Welcome back"}
           </Text>
-          <Text style={[styles.title, { color: colors.text }]}>Dashboard</Text>
+          <Text style={[styles.pageTitle, { color: colors.text }]}>Dashboard</Text>
         </View>
         <Pressable
-          onPress={() => {
-            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-            router.push("/add-transaction");
-          }}
-          style={[styles.addButton, { backgroundColor: colors.tint }]}
+          onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium); router.push("/add-transaction"); }}
+          style={[styles.addBtn, { backgroundColor: colors.tint }]}
         >
-          <Ionicons name="add" size={24} color="#fff" />
+          <Ionicons name="add" size={26} color="#fff" />
         </Pressable>
       </View>
 
       {/* Month Selector */}
-      <View style={[styles.monthSelector, { backgroundColor: colors.surface }]}>
-        <Pressable onPress={goToPrevMonth} hitSlop={12}>
-          <Ionicons name="chevron-back" size={20} color={colors.tint} />
+      <View style={[styles.monthCard, { backgroundColor: colors.surface }]}>
+        <Pressable onPress={goToPrevMonth} hitSlop={16} style={styles.monthChevron}>
+          <Ionicons name="chevron-back" size={22} color={colors.tint} />
         </Pressable>
         <Text style={[styles.monthLabel, { color: colors.text }]}>
           {MONTHS[currentMonth - 1]} {currentYear}
         </Text>
-        <Pressable onPress={goToNextMonth} hitSlop={12} style={{ opacity: isCurrentMonth() ? 0.3 : 1 }}>
-          <Ionicons name="chevron-forward" size={20} color={colors.tint} />
+        <Pressable onPress={goToNextMonth} hitSlop={16} style={[styles.monthChevron, { opacity: isCurrentMonth() ? 0.25 : 1 }]}>
+          <Ionicons name="chevron-forward" size={22} color={colors.tint} />
         </Pressable>
       </View>
 
       {/* Balance Card */}
-      <LinearGradient
-        colors={cardTheme.colors as any}
-        start={cardTheme.start}
-        end={cardTheme.end}
-        style={styles.balanceCard}
-      >
-        <Text style={styles.balanceLabel}>Net Balance</Text>
-        <Text style={styles.balanceAmount}>
-          {bal >= 0 ? "+" : ""}{profile.currency ?? "$"}{Math.abs(bal).toLocaleString("en-US", { minimumFractionDigits: 2 })}
-        </Text>
-        <View style={styles.incomeExpenseRow}>
-          <View style={styles.incomeExpenseItem}>
-            <View style={styles.incomeExpenseIcon}>
-              <Ionicons name="arrow-down-circle" size={18} color="#fff" />
+      <View style={styles.balanceCard}>
+        {hasCardPhoto ? (
+          <Image source={{ uri: profile.cardImageUri }} style={[StyleSheet.absoluteFill, { borderRadius: radius.xl }]} resizeMode="cover" />
+        ) : (
+          <LinearGradient colors={cardTheme.colors as any} start={cardTheme.start} end={cardTheme.end} style={[StyleSheet.absoluteFill, { borderRadius: radius.xl }]} />
+        )}
+        <View style={[StyleSheet.absoluteFill, styles.cardOverlay, { borderRadius: radius.xl }]} />
+        <View style={styles.cardContent}>
+          <Text style={styles.balLabel}>Net Balance</Text>
+          <Text style={styles.balAmount}>
+            {bal >= 0 ? "+" : ""}{cur}{Math.abs(bal).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+          </Text>
+          <View style={styles.balRow}>
+            <View style={styles.balItem}>
+              <View style={styles.balIcon}>
+                <Ionicons name="arrow-down-circle" size={18} color="rgba(255,255,255,0.9)" />
+              </View>
+              <View>
+                <Text style={styles.balItemLabel}>Income</Text>
+                <Text style={styles.balItemAmt}>{cur}{(summary?.totalIncome ?? 0).toLocaleString("en-US", { minimumFractionDigits: 2 })}</Text>
+              </View>
             </View>
-            <View>
-              <Text style={styles.incomeExpenseItemLabel}>Income</Text>
-              <Text style={styles.incomeExpenseItemAmount}>
-                {profile.currency ?? "$"}{(summary?.totalIncome ?? 0).toLocaleString("en-US", { minimumFractionDigits: 2 })}
-              </Text>
-            </View>
-          </View>
-          <View style={styles.divider} />
-          <View style={styles.incomeExpenseItem}>
-            <View style={styles.incomeExpenseIcon}>
-              <Ionicons name="arrow-up-circle" size={18} color="#fff" />
-            </View>
-            <View>
-              <Text style={styles.incomeExpenseItemLabel}>Expense</Text>
-              <Text style={styles.incomeExpenseItemAmount}>
-                {profile.currency ?? "$"}{(summary?.totalExpense ?? 0).toLocaleString("en-US", { minimumFractionDigits: 2 })}
-              </Text>
+            <View style={styles.balDivider} />
+            <View style={styles.balItem}>
+              <View style={styles.balIcon}>
+                <Ionicons name="arrow-up-circle" size={18} color="rgba(255,255,255,0.9)" />
+              </View>
+              <View>
+                <Text style={styles.balItemLabel}>Expenses</Text>
+                <Text style={styles.balItemAmt}>{cur}{(summary?.totalExpense ?? 0).toLocaleString("en-US", { minimumFractionDigits: 2 })}</Text>
+              </View>
             </View>
           </View>
         </View>
-      </LinearGradient>
+      </View>
 
       {/* Spending Breakdown */}
       {(summary?.expenseByCategory?.length ?? 0) > 0 && (
         <View style={[styles.card, { backgroundColor: colors.surface }]}>
-          <Text style={[styles.sectionTitle, { color: colors.text }]}>Spending Breakdown</Text>
+          <Text style={[styles.cardTitle, { color: colors.text }]}>Spending Breakdown</Text>
           <View style={styles.chartRow}>
             <DonutChart
               segments={segments}
               size={140}
               strokeWidth={22}
-              centerLabel={`$${(summary?.totalExpense ?? 0).toFixed(0)}`}
+              centerLabel={`${cur}${(summary?.totalExpense ?? 0).toFixed(0)}`}
               centerSubLabel="Spent"
             />
-            <View style={styles.legendContainer}>
+            <View style={styles.legend}>
               {(summary?.expenseByCategory ?? []).slice(0, 5).map(cat => (
                 <View key={cat.categoryId} style={styles.legendItem}>
                   <View style={[styles.legendDot, { backgroundColor: cat.categoryColor }]} />
-                  <Text style={[styles.legendLabel, { color: colors.textSecondary }]} numberOfLines={1}>
-                    {cat.categoryName}
-                  </Text>
-                  <Text style={[styles.legendPct, { color: colors.text }]}>
-                    {cat.percentage.toFixed(0)}%
-                  </Text>
+                  <Text style={[styles.legendLabel, { color: colors.textSecondary }]} numberOfLines={1}>{cat.categoryName}</Text>
+                  <Text style={[styles.legendPct, { color: colors.text }]}>{cat.percentage.toFixed(0)}%</Text>
                 </View>
               ))}
             </View>
@@ -228,9 +198,9 @@ export default function DashboardScreen() {
       )}
 
       {/* Recent Transactions */}
-      <View style={styles.sectionHeader}>
-        <Text style={[styles.sectionTitle, { color: colors.text }]}>Recent Transactions</Text>
-        <Pressable onPress={() => router.push("/transactions")}>
+      <View style={styles.sectionRow}>
+        <Text style={[styles.cardTitle, { color: colors.text }]}>Recent</Text>
+        <Pressable onPress={() => router.push("/(tabs)/transactions")}>
           <Text style={[styles.seeAll, { color: colors.tint }]}>See All</Text>
         </Pressable>
       </View>
@@ -238,11 +208,9 @@ export default function DashboardScreen() {
       <View style={[styles.card, { backgroundColor: colors.surface, padding: 0, overflow: "hidden" }]}>
         {(summary?.recentTransactions?.length ?? 0) === 0 ? (
           <View style={styles.emptyState}>
-            <Ionicons name="receipt-outline" size={40} color={colors.textTertiary} />
-            <Text style={[styles.emptyText, { color: colors.textSecondary }]}>No transactions yet</Text>
-            <Text style={[styles.emptySubText, { color: colors.textTertiary }]}>
-              Tap + to add your first transaction
-            </Text>
+            <Ionicons name="receipt-outline" size={44} color={colors.textTertiary} />
+            <Text style={[styles.emptyTitle, { color: colors.text }]}>No transactions yet</Text>
+            <Text style={[styles.emptySub, { color: colors.textSecondary }]}>Tap + to add your first transaction</Text>
           </View>
         ) : (
           (summary?.recentTransactions ?? []).map((t, i) => (
@@ -252,7 +220,7 @@ export default function DashboardScreen() {
                 onPress={() => router.push({ pathname: "/transaction-detail", params: { id: t.id } })}
               />
               {i < (summary?.recentTransactions?.length ?? 0) - 1 && (
-                <View style={[styles.separator, { backgroundColor: colors.borderLight }]} />
+                <View style={[styles.sep, { backgroundColor: colors.borderLight }]} />
               )}
             </View>
           ))
@@ -264,153 +232,44 @@ export default function DashboardScreen() {
 
 const styles = StyleSheet.create({
   scroll: { flex: 1 },
-  content: { paddingHorizontal: spacing.md, gap: spacing.md },
-  loadingContainer: {
-    flex: 1,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  header: {
+  loadingWrap: { flex: 1, alignItems: "center", justifyContent: "center" },
+  header: { flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
+  greeting: { fontSize: 13, fontFamily: "Inter_400Regular" },
+  pageTitle: { fontSize: fontSize.xxl, fontFamily: "Inter_700Bold" },
+  addBtn: { width: 46, height: 46, borderRadius: 23, alignItems: "center", justifyContent: "center" },
+  monthCard: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
-  },
-  greeting: {
-    fontSize: fontSize.sm,
-    fontFamily: "Inter_400Regular",
-  },
-  title: {
-    fontSize: fontSize.xxl,
-    fontFamily: "Inter_700Bold",
-  },
-  addButton: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  monthSelector: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    borderRadius: radius.lg,
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.sm + 2,
-  },
-  monthLabel: {
-    fontSize: fontSize.md,
-    fontFamily: "Inter_600SemiBold",
-  },
-  balanceCard: {
     borderRadius: radius.xl,
-    padding: spacing.lg,
-    gap: spacing.sm,
+    paddingHorizontal: spacing.md,
+    paddingVertical: 14,
   },
-  balanceLabel: {
-    color: "rgba(255,255,255,0.8)",
-    fontSize: fontSize.sm,
-    fontFamily: "Inter_500Medium",
-  },
-  balanceAmount: {
-    color: "#fff",
-    fontSize: fontSize.display,
-    fontFamily: "Inter_700Bold",
-    letterSpacing: -1,
-  },
-  incomeExpenseRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    marginTop: spacing.sm,
-    gap: spacing.md,
-  },
-  incomeExpenseItem: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: spacing.sm,
-    flex: 1,
-  },
-  incomeExpenseIcon: {
-    opacity: 0.8,
-  },
-  incomeExpenseItemLabel: {
-    color: "rgba(255,255,255,0.7)",
-    fontSize: fontSize.xs,
-    fontFamily: "Inter_400Regular",
-  },
-  incomeExpenseItemAmount: {
-    color: "#fff",
-    fontSize: fontSize.sm,
-    fontFamily: "Inter_600SemiBold",
-  },
-  divider: {
-    width: 1,
-    height: 32,
-    backgroundColor: "rgba(255,255,255,0.2)",
-  },
-  card: {
-    borderRadius: radius.lg,
-    padding: spacing.md,
-  },
-  sectionHeader: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    paddingHorizontal: spacing.xs,
-  },
-  sectionTitle: {
-    fontSize: fontSize.lg,
-    fontFamily: "Inter_600SemiBold",
-  },
-  seeAll: {
-    fontSize: fontSize.sm,
-    fontFamily: "Inter_500Medium",
-  },
-  chartRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: spacing.lg,
-    marginTop: spacing.md,
-  },
-  legendContainer: {
-    flex: 1,
-    gap: spacing.sm,
-  },
-  legendItem: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: spacing.sm,
-  },
-  legendDot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-  },
-  legendLabel: {
-    flex: 1,
-    fontSize: fontSize.xs,
-    fontFamily: "Inter_400Regular",
-  },
-  legendPct: {
-    fontSize: fontSize.xs,
-    fontFamily: "Inter_600SemiBold",
-  },
-  emptyState: {
-    padding: spacing.xxl,
-    alignItems: "center",
-    gap: spacing.sm,
-  },
-  emptyText: {
-    fontSize: fontSize.md,
-    fontFamily: "Inter_500Medium",
-  },
-  emptySubText: {
-    fontSize: fontSize.sm,
-    fontFamily: "Inter_400Regular",
-    textAlign: "center",
-  },
-  separator: {
-    height: 1,
-    marginHorizontal: spacing.md,
-  },
+  monthChevron: { padding: 4 },
+  monthLabel: { fontSize: fontSize.md, fontFamily: "Inter_600SemiBold" },
+  balanceCard: { height: 176, borderRadius: radius.xl, overflow: "hidden" },
+  cardOverlay: { backgroundColor: "rgba(0,0,0,0.22)" },
+  cardContent: { flex: 1, padding: spacing.lg, justifyContent: "space-between" },
+  balLabel: { color: "rgba(255,255,255,0.8)", fontSize: 13, fontFamily: "Inter_500Medium" },
+  balAmount: { color: "#fff", fontSize: 38, fontFamily: "Inter_700Bold", letterSpacing: -1.5, marginTop: 2 },
+  balRow: { flexDirection: "row", alignItems: "center", gap: spacing.md },
+  balItem: { flexDirection: "row", alignItems: "center", gap: spacing.sm, flex: 1 },
+  balIcon: { opacity: 0.85 },
+  balItemLabel: { color: "rgba(255,255,255,0.7)", fontSize: 11, fontFamily: "Inter_400Regular" },
+  balItemAmt: { color: "#fff", fontSize: fontSize.sm, fontFamily: "Inter_600SemiBold", marginTop: 1 },
+  balDivider: { width: 1, height: 30, backgroundColor: "rgba(255,255,255,0.25)" },
+  card: { borderRadius: radius.xl, padding: spacing.md },
+  cardTitle: { fontSize: fontSize.lg, fontFamily: "Inter_600SemiBold", marginBottom: spacing.sm },
+  chartRow: { flexDirection: "row", alignItems: "center", gap: spacing.lg },
+  legend: { flex: 1, gap: spacing.sm },
+  legendItem: { flexDirection: "row", alignItems: "center", gap: spacing.sm },
+  legendDot: { width: 8, height: 8, borderRadius: 4 },
+  legendLabel: { flex: 1, fontSize: fontSize.xs, fontFamily: "Inter_400Regular" },
+  legendPct: { fontSize: fontSize.xs, fontFamily: "Inter_600SemiBold" },
+  sectionRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingHorizontal: 2 },
+  seeAll: { fontSize: fontSize.sm, fontFamily: "Inter_500Medium" },
+  emptyState: { padding: spacing.xxl, alignItems: "center", gap: spacing.sm },
+  emptyTitle: { fontSize: fontSize.md, fontFamily: "Inter_500Medium" },
+  emptySub: { fontSize: fontSize.sm, fontFamily: "Inter_400Regular", textAlign: "center" },
+  sep: { height: 1, marginHorizontal: spacing.md },
 });
