@@ -147,9 +147,29 @@ export default function AccountScreen() {
         })),
       };
       const json = JSON.stringify(data, null, 2);
-      const fileUri = `${FileSystem.cacheDirectory}fintrack-export-${Date.now()}.json`;
+
+      if (Platform.OS === "web") {
+        const blob = new Blob([json], { type: "application/json" });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = `fintrack-export-${Date.now()}.json`;
+        a.click();
+        URL.revokeObjectURL(url);
+        Alert.alert("Exported", "Your data has been downloaded.");
+        return;
+      }
+
+      const cacheDir = FileSystem.cacheDirectory;
+      if (!cacheDir) {
+        Alert.alert("Export failed", "Could not access the file cache directory.");
+        return;
+      }
+
+      const fileUri = `${cacheDir}fintrack-export-${Date.now()}.json`;
       await FileSystem.writeAsStringAsync(fileUri, json, { encoding: FileSystem.EncodingType.UTF8 });
-      if (await Sharing.isAvailableAsync()) {
+      const canShare = await Sharing.isAvailableAsync();
+      if (canShare) {
         await Sharing.shareAsync(fileUri, { mimeType: "application/json", dialogTitle: "Export Fintrack Data" });
       } else {
         Alert.alert("Exported", `File saved to: ${fileUri}`);
@@ -416,7 +436,7 @@ export default function AccountScreen() {
         {/* APP */}
         <Text style={[styles.sectionLabel, { color: colors.textSecondary }]}>APP</Text>
         <View style={[styles.card, { backgroundColor: colors.surface }]}>
-          <Pressable style={styles.row} onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); router.push("/(tabs)/settings"); }}>
+          <Pressable style={styles.row} onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); router.push("/categories"); }}>
             <View style={[styles.rowIcon, { backgroundColor: "#6A4C93" + "18" }]}>
               <Ionicons name="grid-outline" size={18} color="#6A4C93" />
             </View>
