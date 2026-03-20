@@ -4,6 +4,7 @@ import { Tabs } from "expo-router";
 import { Icon, Label, NativeTabs } from "expo-router/unstable-native-tabs";
 import { SymbolView } from "expo-symbols";
 import { Feather } from "@expo/vector-icons";
+import { Ionicons } from "@expo/vector-icons";
 import React from "react";
 import { Platform, StyleSheet, View, useColorScheme } from "react-native";
 
@@ -24,9 +25,13 @@ function NativeTabLayout() {
         <Icon sf={{ default: "chart.bar", selected: "chart.bar.fill" }} />
         <Label>Budgets</Label>
       </NativeTabs.Trigger>
-      <NativeTabs.Trigger name="settings">
-        <Icon sf={{ default: "gearshape", selected: "gearshape.fill" }} />
-        <Label>Settings</Label>
+      <NativeTabs.Trigger name="reports">
+        <Icon sf={{ default: "chart.line.uptrend.xyaxis", selected: "chart.line.uptrend.xyaxis" }} />
+        <Label>Reports</Label>
+      </NativeTabs.Trigger>
+      <NativeTabs.Trigger name="account">
+        <Icon sf={{ default: "person.circle", selected: "person.circle.fill" }} />
+        <Label>Account</Label>
       </NativeTabs.Trigger>
     </NativeTabs>
   );
@@ -107,17 +112,30 @@ function ClassicTabLayout() {
         }}
       />
       <Tabs.Screen
-        name="settings"
+        name="reports"
         options={{
-          title: "Settings",
+          title: "Reports",
           tabBarIcon: ({ color }) =>
             isIOS ? (
-              <SymbolView name="gearshape" tintColor={color} size={24} />
+              <SymbolView name="chart.line.uptrend.xyaxis" tintColor={color} size={24} />
             ) : (
-              <Feather name="settings" size={22} color={color} />
+              <Ionicons name="stats-chart-outline" size={22} color={color} />
             ),
         }}
       />
+      <Tabs.Screen
+        name="account"
+        options={{
+          title: "Account",
+          tabBarIcon: ({ color }) =>
+            isIOS ? (
+              <SymbolView name="person.circle" tintColor={color} size={24} />
+            ) : (
+              <Ionicons name="person-circle-outline" size={24} color={color} />
+            ),
+        }}
+      />
+      <Tabs.Screen name="settings" options={{ href: null }} />
     </Tabs>
   );
 }

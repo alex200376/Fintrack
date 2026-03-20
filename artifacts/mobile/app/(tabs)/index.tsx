@@ -14,8 +14,11 @@ import { Ionicons } from "@expo/vector-icons";
 import { router, useFocusEffect } from "expo-router";
 import * as Haptics from "expo-haptics";
 
+import { LinearGradient } from "expo-linear-gradient";
+
 import { useTheme } from "@/hooks/useTheme";
 import { useFinance, type FinancialSummary } from "@/context/FinanceContext";
+import { useProfile } from "@/context/ProfileContext";
 import { TransactionItem } from "@/components/TransactionItem";
 import { DonutChart } from "@/components/DonutChart";
 import { spacing, radius, fontSize } from "@/constants/theme";
@@ -29,6 +32,7 @@ export default function DashboardScreen() {
   const { colors, isDark } = useTheme();
   const insets = useSafeAreaInsets();
   const { fetchSummary } = useFinance();
+  const { profile, cardTheme } = useProfile();
   const [summary, setSummary] = useState<FinancialSummary | null>(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -128,7 +132,7 @@ export default function DashboardScreen() {
       <View style={styles.header}>
         <View>
           <Text style={[styles.greeting, { color: colors.textSecondary }]}>
-            Personal Finance
+            {profile.name ? `Hello, ${profile.name} ${profile.avatar}` : "Personal Finance"}
           </Text>
           <Text style={[styles.title, { color: colors.text }]}>Dashboard</Text>
         </View>
@@ -157,10 +161,15 @@ export default function DashboardScreen() {
       </View>
 
       {/* Balance Card */}
-      <View style={[styles.balanceCard, { backgroundColor: colors.tint }]}>
+      <LinearGradient
+        colors={cardTheme.colors as any}
+        start={cardTheme.start}
+        end={cardTheme.end}
+        style={styles.balanceCard}
+      >
         <Text style={styles.balanceLabel}>Net Balance</Text>
         <Text style={styles.balanceAmount}>
-          {bal >= 0 ? "+" : ""}${Math.abs(bal).toLocaleString("en-US", { minimumFractionDigits: 2 })}
+          {bal >= 0 ? "+" : ""}{profile.currency ?? "$"}{Math.abs(bal).toLocaleString("en-US", { minimumFractionDigits: 2 })}
         </Text>
         <View style={styles.incomeExpenseRow}>
           <View style={styles.incomeExpenseItem}>
@@ -170,7 +179,7 @@ export default function DashboardScreen() {
             <View>
               <Text style={styles.incomeExpenseItemLabel}>Income</Text>
               <Text style={styles.incomeExpenseItemAmount}>
-                ${(summary?.totalIncome ?? 0).toLocaleString("en-US", { minimumFractionDigits: 2 })}
+                {profile.currency ?? "$"}{(summary?.totalIncome ?? 0).toLocaleString("en-US", { minimumFractionDigits: 2 })}
               </Text>
             </View>
           </View>
@@ -182,12 +191,12 @@ export default function DashboardScreen() {
             <View>
               <Text style={styles.incomeExpenseItemLabel}>Expense</Text>
               <Text style={styles.incomeExpenseItemAmount}>
-                ${(summary?.totalExpense ?? 0).toLocaleString("en-US", { minimumFractionDigits: 2 })}
+                {profile.currency ?? "$"}{(summary?.totalExpense ?? 0).toLocaleString("en-US", { minimumFractionDigits: 2 })}
               </Text>
             </View>
           </View>
         </View>
-      </View>
+      </LinearGradient>
 
       {/* Spending Breakdown */}
       {(summary?.expenseByCategory?.length ?? 0) > 0 && (
