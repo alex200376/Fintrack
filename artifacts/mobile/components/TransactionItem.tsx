@@ -40,6 +40,18 @@ const ICON_MAP: Record<string, string> = {
   laptop: "laptop-outline",
   "trending-up": "trending-up",
   gift: "gift",
+  home: "home-outline",
+  heart: "heart-outline",
+  fitness: "fitness-outline",
+  "game-controller": "game-controller-outline",
+  cafe: "cafe-outline",
+  bicycle: "bicycle-outline",
+  book: "book-outline",
+  briefcase: "briefcase-outline",
+  beer: "beer-outline",
+  paw: "paw-outline",
+  leaf: "leaf-outline",
+  "musical-notes": "musical-notes-outline",
   "ellipsis-horizontal": "ellipsis-horizontal",
 };
 
