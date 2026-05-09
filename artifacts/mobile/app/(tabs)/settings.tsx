@@ -136,10 +136,31 @@ export default function SettingsScreen() {
           <View style={{ width: 36 }} />
         </View>
 
-        {/* Manage Account Row */}
-        <Text style={[styles.sectionLabel, { color: colors.textSecondary }]}>ACCOUNT</Text>
+        {/* ── MANAGE FINANCIAL ACCOUNTS ── */}
+        <Text style={[styles.sectionLabel, { color: colors.textSecondary }]}>FINANCIAL ACCOUNTS</Text>
         <Pressable
-          style={[styles.accountCard, { backgroundColor: colors.surface }]}
+          style={[styles.manageCard, { backgroundColor: colors.surface }]}
+          onPress={() => {
+            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+            router.push("/financial-accounts");
+          }}
+        >
+          <View style={[styles.manageIconWrap, { backgroundColor: "#0f3460" + "22" }]}>
+            <Ionicons name="wallet" size={22} color="#0f3460" />
+          </View>
+          <View style={styles.manageInfo}>
+            <Text style={[styles.manageName, { color: colors.text }]}>Manage Accounts</Text>
+            <Text style={[styles.manageSub, { color: colors.textSecondary }]}>
+              Credit cards, savings, piggy bank and more
+            </Text>
+          </View>
+          <Ionicons name="chevron-forward" size={18} color={colors.textTertiary} />
+        </Pressable>
+
+        {/* ── PROFILE ── */}
+        <Text style={[styles.sectionLabel, { color: colors.textSecondary }]}>PROFILE</Text>
+        <Pressable
+          style={[styles.manageCard, { backgroundColor: colors.surface }]}
           onPress={() => {
             Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
             router.push("/(tabs)/account");
@@ -148,14 +169,16 @@ export default function SettingsScreen() {
           <View style={[styles.accountAvatar, { backgroundColor: colors.tint + "20" }]}>
             <Text style={styles.accountAvatarEmoji}>{profile.avatar || "💰"}</Text>
           </View>
-          <View style={styles.accountInfo}>
-            <Text style={[styles.accountName, { color: colors.text }]}>{profile.name || "Your Name"}</Text>
-            <Text style={[styles.accountSub, { color: colors.textSecondary }]}>Manage account, currency, appearance</Text>
+          <View style={styles.manageInfo}>
+            <Text style={[styles.manageName, { color: colors.text }]}>{profile.name || "Your Name"}</Text>
+            <Text style={[styles.manageSub, { color: colors.textSecondary }]}>
+              Avatar, currency, appearance &amp; more
+            </Text>
           </View>
           <Ionicons name="chevron-forward" size={18} color={colors.textTertiary} />
         </Pressable>
 
-        {/* Categories Section */}
+        {/* ── CATEGORIES ── */}
         <View style={styles.categoriesHeader}>
           <Text style={[styles.sectionLabel, { color: colors.textSecondary }]}>CATEGORIES</Text>
           <Pressable onPress={openModal} style={[styles.addBtn, { backgroundColor: colors.tint }]}>
@@ -329,33 +352,18 @@ const styles = StyleSheet.create({
     fontSize: 11, fontFamily: "Inter_600SemiBold",
     letterSpacing: 0.9, paddingHorizontal: 4,
   },
-  // Manage Account card
-  accountCard: {
-    borderRadius: radius.xl,
-    flexDirection: "row",
-    alignItems: "center",
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.md,
-    gap: spacing.md,
+  manageCard: {
+    borderRadius: radius.xl, flexDirection: "row", alignItems: "center",
+    paddingHorizontal: spacing.md, paddingVertical: spacing.md, gap: spacing.md,
   },
-  accountAvatar: {
-    width: 48, height: 48, borderRadius: 24,
-    alignItems: "center", justifyContent: "center",
-  },
+  manageIconWrap: { width: 48, height: 48, borderRadius: 14, alignItems: "center", justifyContent: "center" },
+  manageInfo: { flex: 1 },
+  manageName: { fontSize: fontSize.md, fontFamily: "Inter_600SemiBold" },
+  manageSub: { fontSize: 12, fontFamily: "Inter_400Regular", marginTop: 2 },
+  accountAvatar: { width: 48, height: 48, borderRadius: 24, alignItems: "center", justifyContent: "center" },
   accountAvatarEmoji: { fontSize: 26 },
-  accountInfo: { flex: 1 },
-  accountName: { fontSize: fontSize.md, fontFamily: "Inter_600SemiBold" },
-  accountSub: { fontSize: 12, fontFamily: "Inter_400Regular", marginTop: 2 },
-  // Categories section header
-  categoriesHeader: {
-    flexDirection: "row", alignItems: "center",
-    justifyContent: "space-between",
-  },
-  addBtn: {
-    flexDirection: "row", alignItems: "center", gap: 4,
-    paddingHorizontal: spacing.sm, paddingVertical: 6,
-    borderRadius: radius.full,
-  },
+  categoriesHeader: { flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
+  addBtn: { flexDirection: "row", alignItems: "center", gap: 4, paddingHorizontal: spacing.sm, paddingVertical: 6, borderRadius: radius.full },
   addBtnText: { color: "#fff", fontSize: fontSize.sm, fontFamily: "Inter_600SemiBold" },
   tabRow: { flexDirection: "row", borderRadius: radius.xl, padding: 5, gap: 4 },
   tabChip: { flex: 1, alignItems: "center", paddingVertical: 10, borderRadius: radius.lg },
