@@ -19,6 +19,7 @@ import * as Haptics from "expo-haptics";
 
 import { useTheme } from "@/hooks/useTheme";
 import { useFinance, type Category } from "@/context/FinanceContext";
+import { useProfile } from "@/context/ProfileContext";
 import { spacing, radius, fontSize } from "@/constants/theme";
 
 const ICON_OPTIONS = [
@@ -66,6 +67,7 @@ export default function SettingsScreen() {
   const { colors } = useTheme();
   const insets = useSafeAreaInsets();
   const { fetchCategories, createCategory, deleteCategory } = useFinance();
+  const { profile } = useProfile();
   const [categories, setCategories] = useState<Category[]>([]);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<"expense" | "income">("expense");
@@ -130,9 +132,35 @@ export default function SettingsScreen() {
           <Pressable onPress={() => router.back()} style={[styles.backBtn, { backgroundColor: colors.surface }]} hitSlop={8}>
             <Ionicons name="chevron-back" size={20} color={colors.tint} />
           </Pressable>
-          <Text style={[styles.pageTitle, { color: colors.text }]}>Categories</Text>
+          <Text style={[styles.pageTitle, { color: colors.text }]}>Settings</Text>
+          <View style={{ width: 36 }} />
+        </View>
+
+        {/* Manage Account Row */}
+        <Text style={[styles.sectionLabel, { color: colors.textSecondary }]}>ACCOUNT</Text>
+        <Pressable
+          style={[styles.accountCard, { backgroundColor: colors.surface }]}
+          onPress={() => {
+            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+            router.push("/(tabs)/account");
+          }}
+        >
+          <View style={[styles.accountAvatar, { backgroundColor: colors.tint + "20" }]}>
+            <Text style={styles.accountAvatarEmoji}>{profile.avatar || "💰"}</Text>
+          </View>
+          <View style={styles.accountInfo}>
+            <Text style={[styles.accountName, { color: colors.text }]}>{profile.name || "Your Name"}</Text>
+            <Text style={[styles.accountSub, { color: colors.textSecondary }]}>Manage account, currency, appearance</Text>
+          </View>
+          <Ionicons name="chevron-forward" size={18} color={colors.textTertiary} />
+        </Pressable>
+
+        {/* Categories Section */}
+        <View style={styles.categoriesHeader}>
+          <Text style={[styles.sectionLabel, { color: colors.textSecondary }]}>CATEGORIES</Text>
           <Pressable onPress={openModal} style={[styles.addBtn, { backgroundColor: colors.tint }]}>
-            <Ionicons name="add" size={22} color="#fff" />
+            <Ionicons name="add" size={18} color="#fff" />
+            <Text style={styles.addBtnText}>New</Text>
           </Pressable>
         </View>
 
@@ -297,7 +325,38 @@ const styles = StyleSheet.create({
   header: { flexDirection: "row", alignItems: "center", gap: spacing.md },
   backBtn: { width: 36, height: 36, borderRadius: 18, alignItems: "center", justifyContent: "center" },
   pageTitle: { flex: 1, fontSize: fontSize.xxl, fontFamily: "Inter_700Bold" },
-  addBtn: { width: 36, height: 36, borderRadius: 18, alignItems: "center", justifyContent: "center" },
+  sectionLabel: {
+    fontSize: 11, fontFamily: "Inter_600SemiBold",
+    letterSpacing: 0.9, paddingHorizontal: 4,
+  },
+  // Manage Account card
+  accountCard: {
+    borderRadius: radius.xl,
+    flexDirection: "row",
+    alignItems: "center",
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.md,
+    gap: spacing.md,
+  },
+  accountAvatar: {
+    width: 48, height: 48, borderRadius: 24,
+    alignItems: "center", justifyContent: "center",
+  },
+  accountAvatarEmoji: { fontSize: 26 },
+  accountInfo: { flex: 1 },
+  accountName: { fontSize: fontSize.md, fontFamily: "Inter_600SemiBold" },
+  accountSub: { fontSize: 12, fontFamily: "Inter_400Regular", marginTop: 2 },
+  // Categories section header
+  categoriesHeader: {
+    flexDirection: "row", alignItems: "center",
+    justifyContent: "space-between",
+  },
+  addBtn: {
+    flexDirection: "row", alignItems: "center", gap: 4,
+    paddingHorizontal: spacing.sm, paddingVertical: 6,
+    borderRadius: radius.full,
+  },
+  addBtnText: { color: "#fff", fontSize: fontSize.sm, fontFamily: "Inter_600SemiBold" },
   tabRow: { flexDirection: "row", borderRadius: radius.xl, padding: 5, gap: 4 },
   tabChip: { flex: 1, alignItems: "center", paddingVertical: 10, borderRadius: radius.lg },
   tabText: { fontSize: fontSize.sm, fontFamily: "Inter_600SemiBold" },
